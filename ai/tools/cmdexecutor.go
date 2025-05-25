@@ -74,7 +74,6 @@ func cmdExecutor(args ...any) (any, error) {
 
 	// print the command to be executed
 	utils.PrintlnTitle("=>", fmt.Sprintf("CMD (with %.2f seconds):", timeoutInt.Seconds()))
-	commandSlice := strings.Split(command, " ")
 	utils.PrintMessage(command)
 	// If user input is required, ask for confirmation
 	if !waitingUserInput() {
@@ -84,7 +83,7 @@ func cmdExecutor(args ...any) (any, error) {
 	// Execute the command, with timeout (default: 10,000 ms)
 	ctx, cancel := context.WithTimeout(context.Background(), timeoutInt)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, commandSlice[0], commandSlice[1:]...)
+	cmd := exec.CommandContext(ctx, "bash", "-c", command)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
