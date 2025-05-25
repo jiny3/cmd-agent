@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
+	"strings"
 	"time"
 
 	"google.golang.org/genai"
@@ -24,8 +25,8 @@ func cmdExecutorFunctionDeclaration() *genai.FunctionDeclaration {
 				},
 				"timeout": {
 					Type:        "string",
-					Description: "timeout in seconds for the command execution, in case the command loops forever",
-					Example:     "10",
+					Description: "timeout in milliseconds for the command execution, in case the command loops forever",
+					Example:     "10000ms, 5s, 10s, 1m",
 				},
 			},
 			Required: []string{
@@ -49,6 +50,7 @@ func CmdExecutorTool() *genai.Tool {
 }
 
 func cmdExecutor(args ...any) (any, error) {
+	// Validate arguments
 	if len(args) < 2 {
 		return nil, fmt.Errorf("cmd_executor requires 2 arguments, got %d", len(args))
 	}
@@ -60,7 +62,7 @@ func cmdExecutor(args ...any) (any, error) {
 	if !ok {
 		return nil, fmt.Errorf("timeout must be a string, got %T", args[1])
 	}
-	timeoutInt, err := time.ParseDuration(timeout + "s")
+	timeoutInt, err := time.ParseDuration(timeout)
 	if err != nil {
 		return nil, fmt.Errorf("invalid timeout value: %s, error: %v", timeout, err)
 	}
@@ -69,12 +71,13 @@ func cmdExecutor(args ...any) (any, error) {
 	}
 
 	// print the command to be executed
-	fmt.Println("=> CMD:")
+	fmt.Printf("=> CMD (with %.2f seconds):\n", timeoutInt.Seconds())
+	commandSlice := strings.Split(command, " ")
 	fmt.Println(command)
-	// Execute the command, with timeout (default: 10s)
-	ctx, cancel := context.WithTimeout(context.Background(), timeoutInt*time.Second)
+	// Execute the command, with timeout (default: 10,000 ms)
+	ctx, cancel := context.WithTimeout(context.Background(), timeoutInt)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "bash", "-c", command)
+	cmd := exec.CommandContext(ctx, commandSlice[0], commandSlice[1:]...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
@@ -84,7 +87,11 @@ func cmdExecutor(args ...any) (any, error) {
 	outStr, errStr := stdout.String(), stderr.String()
 	if err != nil {
 		fmt.Println("=> FAIL:")
-		fmt.Println(err)
+		if err == context.DeadlineExceeded {
+			fmt.Println("Command timed out after", timeoutInt)
+		} else {
+			fmt.Println(err)
+		}
 		if errStr != "" {
 			fmt.Println("=> STDERR:")
 			fmt.Println(errStr)
