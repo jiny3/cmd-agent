@@ -94,6 +94,7 @@ func GenerateContent(prompt string, tool ...*genai.Tool) (string, error) {
 			return "", err
 		}
 	}
-
+	utils.PrintlnTitle("gemini", "response:")
+	utils.PrintMessage(result.Text())
 	return result.Text(), nil
 }
