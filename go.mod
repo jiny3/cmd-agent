@@ -3,6 +3,7 @@ module github.com/jiny3/cmd-agent
 go 1.23.5
 
 require (
+	github.com/jiny3/gopkg v0.0.0-20250525092336-e8c7630b247e
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/viper v1.19.0
 	google.golang.org/genai v1.6.0
@@ -46,7 +47,6 @@ require (
 	github.com/google/s2a-go v0.1.8 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.4 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
-	github.com/jiny3/gopkg v0.0.0-20250414104743-a000ef6e2ad0
 	github.com/spf13/cobra v1.9.1
 	go.opencensus.io v0.24.0 // indirect
 	golang.org/x/crypto v0.35.0 // indirect
