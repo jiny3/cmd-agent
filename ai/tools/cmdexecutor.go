@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/fatih/color"
+	"github.com/jiny3/cmd-agent/utils"
 	"google.golang.org/genai"
 )
 
@@ -71,9 +73,14 @@ func cmdExecutor(args ...any) (any, error) {
 	}
 
 	// print the command to be executed
-	fmt.Printf("=> CMD (with %.2f seconds):\n", timeoutInt.Seconds())
+	utils.PrintlnTitle("=>", fmt.Sprintf("CMD (with %.2f seconds):", timeoutInt.Seconds()))
 	commandSlice := strings.Split(command, " ")
-	fmt.Println(command)
+	utils.PrintMessage(command)
+	// If user input is required, ask for confirmation
+	if !waitingUserInput() {
+		return nil, fmt.Errorf("command execution aborted by user")
+	}
+
 	// Execute the command, with timeout (default: 10,000 ms)
 	ctx, cancel := context.WithTimeout(context.Background(), timeoutInt)
 	defer cancel()
@@ -81,28 +88,37 @@ func cmdExecutor(args ...any) (any, error) {
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
-
 	// Run the command
 	err = cmd.Run()
 	outStr, errStr := stdout.String(), stderr.String()
 	if err != nil {
-		fmt.Println("=> FAIL:")
+		utils.PrintlnErrTitle("=>", "FAIL:")
 		if err == context.DeadlineExceeded {
-			fmt.Println("Command timed out after", timeoutInt)
+			utils.PrintErr(fmt.Sprintf("Command timed out after %.2f", timeoutInt.Seconds()))
 		} else {
-			fmt.Println(err)
+			utils.PrintErr(err.Error())
 		}
 		if errStr != "" {
-			fmt.Println("=> STDERR:")
-			fmt.Println(errStr)
+			utils.PrintlnWarnTitle("=>", "STDERR:")
+			utils.PrintWarn(errStr)
 		}
 		return nil, err
 	}
-	fmt.Println("=> SUCCESS:")
-	fmt.Println(outStr)
+	utils.PrintlnTitle("=>", "SUCCESS:")
+	utils.PrintMessage(outStr)
 	if errStr != "" {
-		fmt.Println("=> STDERR:")
-		fmt.Println(errStr)
+		utils.PrintlnWarnTitle("=>", "STDERR:")
+		utils.PrintWarn(errStr)
 	}
 	return []string{outStr, errStr}, nil
+}
+
+func waitingUserInput() bool {
+	utils.PrintTitle("<=", fmt.Sprintf("Allow to execute command? (%s/%s): ", color.GreenString("Y"), color.RedString("N")))
+	var input string
+	fmt.Scanln(&input)
+	if strings.ToLower(input) == "y" || strings.ToLower(input) == "yes" {
+		return true
+	}
+	return false
 }
