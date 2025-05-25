@@ -19,7 +19,7 @@ var rootCmd = &cobra.Command{
 			return
 		}
 		prompt := args[0]
-		resp, err := client.GenerateContent(prompt, tools.CmdExecutorTool())
+		resp, err := client.GenerateContent(prompt, tools.ListTools()...)
 		if err != nil {
 			logrus.Fatal(err)
 		}
