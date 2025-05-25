@@ -8,17 +8,10 @@ import (
 	"google.golang.org/genai"
 )
 
-const (
-	// cmdExecutorToolName is the name of the command executor tool.
-	cmdExecutorToolName = "cmd_executor"
-	// cmdExecutorToolDescription is the description of the command executor tool.
-	cmdExecutorToolDescription = "Execute a command in the shell"
-)
-
-func cmdExecutorToolDeclaration() *genai.FunctionDeclaration {
+func cmdExecutorFunctionDeclaration() *genai.FunctionDeclaration {
 	return &genai.FunctionDeclaration{
-		Name:        cmdExecutorToolName,
-		Description: cmdExecutorToolDescription,
+		Name:        "cmd_executor",
+		Description: "Execute a command in the shell",
 		Parameters: &genai.Schema{
 			Type: genai.Type("object"),
 			Properties: map[string]*genai.Schema{
@@ -36,14 +29,26 @@ func cmdExecutorToolDeclaration() *genai.FunctionDeclaration {
 }
 
 func CmdExecutorTool() *genai.Tool {
+	declarations := []*genai.FunctionDeclaration{
+		cmdExecutorFunctionDeclaration(),
+	}
+	// Register the cmd_executor function
+	for _, declaration := range declarations {
+		register(declaration.Name, functionHandler(cmdExecutor))
+	}
 	return &genai.Tool{
-		FunctionDeclarations: []*genai.FunctionDeclaration{
-			cmdExecutorToolDeclaration(),
-		},
+		FunctionDeclarations: declarations,
 	}
 }
 
-func CmdExecutor(command string) (string, string, error) {
+func cmdExecutor(args ...any) (any, error) {
+	if len(args) == 0 {
+		return nil, fmt.Errorf("arguments are required")
+	}
+	command, ok := args[0].(string)
+	if !ok {
+		return nil, fmt.Errorf("command must be a string, got %T", args[0])
+	}
 	// print the command to be executed
 	fmt.Println("=> CMD:")
 	fmt.Println(command)
@@ -60,7 +65,7 @@ func CmdExecutor(command string) (string, string, error) {
 			fmt.Println("=> ERROR:")
 			fmt.Println(errStr)
 		}
-		return "", errStr, err
+		return nil, err
 	}
 	fmt.Println("=> SUCCESS:")
 	fmt.Println(outStr)
@@ -68,5 +73,5 @@ func CmdExecutor(command string) (string, string, error) {
 		fmt.Println("=> ERROR:")
 		fmt.Println(errStr)
 	}
-	return outStr, errStr, nil
+	return []string{outStr, errStr}, nil
 }
