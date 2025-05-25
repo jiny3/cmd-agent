@@ -40,7 +40,7 @@ func init() {
 }
 
 func GenerateContent(prompt string, tool ...*genai.Tool) (string, error) {
-	_prompt := []*genai.Content{systemContent}
+	_prompt := systemContents
 	_prompt = append(_prompt, genai.Text(prompt)...)
 	result, err := aiClient.Models.GenerateContent(
 		context.Background(),
