@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/jiny3/cmd-agent/ai/tools"
+	"github.com/jiny3/cmd-agent/utils"
 	"github.com/jiny3/gopkg/hookx"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -17,7 +18,7 @@ var (
 )
 
 func init() {
-	hookx.Init(&hookx.WithDefault)
+	hookx.Init(&utils.Init)
 	apiKey = viper.GetString("api.key")
 	if apiKey == "" {
 		logrus.Fatal("api key is empty")
@@ -50,6 +51,7 @@ func GenerateContent(prompt string, tool ...*genai.Tool) (string, error) {
 		},
 	)
 	if err != nil {
+		logrus.WithError(err).Debug("generate content failed")
 		return "", err
 	}
 
@@ -66,15 +68,18 @@ func GenerateContent(prompt string, tool ...*genai.Tool) (string, error) {
 			}
 
 			// execute function
-			out, _err := handle(call.Args["command"])
-			outStr, errStr := (out.([]string))[0], (out.([]string))[1]
-			errResp := ""
+			errResp, outStr := "", ""
+			out, _err := handle(call.Args["command"], call.Args["timeout"])
 			if _err != nil {
 				errResp = _err.Error()
+			} else {
+				outStr = (out.([]string))[0]
+				errResp += (out.([]string))[1]
 			}
+			logrus.WithField("output", outStr).WithField("error", errResp).Debug("function call response")
 			_prompt = append(_prompt, FormatFunctionCallResponse(call, map[string]any{
 				"output": outStr,
-				"error":  errStr + errResp,
+				"error":  errResp,
 			}))
 		}
 		result, err = aiClient.Models.GenerateContent(
