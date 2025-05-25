@@ -2,8 +2,10 @@ package tools
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os/exec"
+	"time"
 
 	"google.golang.org/genai"
 )
@@ -19,6 +21,11 @@ func cmdExecutorFunctionDeclaration() *genai.FunctionDeclaration {
 					Type:        "string",
 					Description: "command to execute",
 					Example:     "echo \"hello world\"",
+				},
+				"timeout": {
+					Type:        "string",
+					Description: "timeout in seconds for the command execution, in case the command loops forever",
+					Example:     "10",
 				},
 			},
 			Required: []string{
@@ -42,27 +49,44 @@ func CmdExecutorTool() *genai.Tool {
 }
 
 func cmdExecutor(args ...any) (any, error) {
-	if len(args) == 0 {
-		return nil, fmt.Errorf("arguments are required")
+	if len(args) < 2 {
+		return nil, fmt.Errorf("cmd_executor requires 2 arguments, got %d", len(args))
 	}
 	command, ok := args[0].(string)
 	if !ok {
 		return nil, fmt.Errorf("command must be a string, got %T", args[0])
 	}
+	timeout, ok := args[1].(string)
+	if !ok {
+		return nil, fmt.Errorf("timeout must be a string, got %T", args[1])
+	}
+	timeoutInt, err := time.ParseDuration(timeout + "s")
+	if err != nil {
+		return nil, fmt.Errorf("invalid timeout value: %s, error: %v", timeout, err)
+	}
+	if timeoutInt <= 0 {
+		return nil, fmt.Errorf("timeout must be greater than 0, got %d", timeoutInt)
+	}
+
 	// print the command to be executed
 	fmt.Println("=> CMD:")
 	fmt.Println(command)
-	// Execute the command
-	cmd := exec.Command("bash", "-c", command)
+	// Execute the command, with timeout (default: 10s)
+	ctx, cancel := context.WithTimeout(context.Background(), timeoutInt*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "bash", "-c", command)
 	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout // 标准输出
-	cmd.Stderr = &stderr // 标准错误
-	err := cmd.Run()
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	// Run the command
+	err = cmd.Run()
 	outStr, errStr := stdout.String(), stderr.String()
 	if err != nil {
-		fmt.Println("=> FAIL:", err)
+		fmt.Println("=> FAIL:")
+		fmt.Println(err)
 		if errStr != "" {
-			fmt.Println("=> ERROR:")
+			fmt.Println("=> STDERR:")
 			fmt.Println(errStr)
 		}
 		return nil, err
@@ -70,7 +94,7 @@ func cmdExecutor(args ...any) (any, error) {
 	fmt.Println("=> SUCCESS:")
 	fmt.Println(outStr)
 	if errStr != "" {
-		fmt.Println("=> ERROR:")
+		fmt.Println("=> STDERR:")
 		fmt.Println(errStr)
 	}
 	return []string{outStr, errStr}, nil
