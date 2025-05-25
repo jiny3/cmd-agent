@@ -39,15 +39,6 @@ func init() {
 }
 
 func GenerateContent(prompt string, tool ...*genai.Tool) (string, error) {
-	systemContent := &genai.Content{
-		Role: genai.RoleUser,
-		Parts: []*genai.Part{
-			{
-				// A system prompt to instruct the AI model about the task
-				Text: "You are a shell expert, please help me complete the following command, you should output the completed command, no need to include any other explanation. Do not put completed command in a code block. Then execute the command by cmd_executor function call.",
-			},
-		},
-	}
 	_prompt := []*genai.Content{systemContent}
 	_prompt = append(_prompt, genai.Text(prompt)...)
 	result, err := aiClient.Models.GenerateContent(
@@ -66,30 +57,25 @@ func GenerateContent(prompt string, tool ...*genai.Tool) (string, error) {
 	for len(result.FunctionCalls()) > 0 {
 		_prompt = append(_prompt, result.Candidates[0].Content)
 		for _, call := range result.FunctionCalls() {
-			// TODO: handle function call
 			logrus.WithField("name", call.Name).WithField("args", call.Args).Debug("function call")
-			if call.Name == tool[0].FunctionDeclarations[0].Name {
-				output, stderr, _err := tools.CmdExecutor(call.Args["command"].(string))
-				errResp := ""
-				if _err != nil {
-					errResp = _err.Error()
-				}
-				_prompt = append(_prompt, &genai.Content{
-					Role: genai.RoleUser,
-					Parts: []*genai.Part{
-						{
-							FunctionResponse: &genai.FunctionResponse{
-								ID:   call.ID,
-								Name: call.Name,
-								Response: map[string]any{
-									"output": output,
-									"error":  stderr + errResp,
-								},
-							},
-						},
-					},
-				})
+
+			// get function handler
+			handle, exist := tools.GetHandler(call.Name)
+			if !exist {
+				_prompt = append(_prompt, FormatFunctionCallResponse(call, map[string]any{"error": "function not found"}))
 			}
+
+			// execute function
+			out, _err := handle(call.Args["command"])
+			outStr, errStr := (out.([]string))[0], (out.([]string))[1]
+			errResp := ""
+			if _err != nil {
+				errResp = _err.Error()
+			}
+			_prompt = append(_prompt, FormatFunctionCallResponse(call, map[string]any{
+				"output": outStr,
+				"error":  errStr + errResp,
+			}))
 		}
 		result, err = aiClient.Models.GenerateContent(
 			context.Background(),
