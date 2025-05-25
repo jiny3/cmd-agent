@@ -18,10 +18,18 @@ func Test_cmdExecutor(t *testing.T) {
 		{
 			name: "valid command with timeout",
 			args: args{
-				args: []any{"sleep 12", "10"},
+				args: []any{"sleep 12", "3s"},
 			},
 			want:    nil,
 			wantErr: true,
+		},
+		{
+			name: "valid command with timeout",
+			args: args{
+				args: []any{"sleep 12", "20s"},
+			},
+			want:    []string{"", ""},
+			wantErr: false,
 		},
 	}
 	for _, tt := range tests {
