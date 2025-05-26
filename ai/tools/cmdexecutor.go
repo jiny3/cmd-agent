@@ -25,11 +25,6 @@ func cmdExecutorFunctionDeclaration() *genai.FunctionDeclaration {
 					Description: "command to execute",
 					Example:     "echo \"hello world\"",
 				},
-				"timeout": {
-					Type:        "string",
-					Description: "timeout in milliseconds for the command execution, in case the command loops forever",
-					Example:     "10000ms, 5s, 10s, 1m",
-				},
 			},
 			Required: []string{
 				"command",
@@ -53,35 +48,24 @@ func CmdExecutorTool() *genai.Tool {
 
 func cmdExecutor(args ...any) (any, error) {
 	// Validate arguments
-	if len(args) < 2 {
-		return nil, fmt.Errorf("cmd_executor requires 2 arguments, got %d", len(args))
+	if len(args) < 1 {
+		return nil, fmt.Errorf("cmd_executor requires 1 arguments, got %d", len(args))
 	}
 	command, ok := args[0].(string)
 	if !ok {
 		return nil, fmt.Errorf("command must be a string, got %T", args[0])
 	}
-	timeout, ok := args[1].(string)
-	if !ok {
-		return nil, fmt.Errorf("timeout must be a string, got %T", args[1])
-	}
-	timeoutInt, err := time.ParseDuration(timeout)
-	if err != nil {
-		return nil, fmt.Errorf("invalid timeout value: %s, error: %v", timeout, err)
-	}
-	if timeoutInt <= 0 {
-		return nil, fmt.Errorf("timeout must be greater than 0, got %d", timeoutInt)
-	}
 
 	// print the command to be executed
-	utils.PrintlnTitle("=>", fmt.Sprintf("CMD (with %.2f seconds):", timeoutInt.Seconds()))
+	utils.PrintlnTitle("=>", "CMD:")
 	utils.PrintMessage(command)
 	// If user input is required, ask for confirmation
-	if !waitingUserInput() {
+	if !waitingUserAllow() {
 		return nil, fmt.Errorf("command execution aborted by user")
 	}
 
-	// Execute the command, with timeout (default: 10,000 ms)
-	ctx, cancel := context.WithTimeout(context.Background(), timeoutInt)
+	// Execute the command
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "bash", "-c", command)
 	var stdout, stderr bytes.Buffer
@@ -112,12 +96,17 @@ func cmdExecutor(args ...any) (any, error) {
 	return []string{outStr, errStr}, nil
 }
 
-func waitingUserInput() bool {
-	utils.PrintTitle("<=", fmt.Sprintf("Allow to execute command? (%s/%s): ", color.GreenString("Y"), color.RedString("N")))
+func waitingUserAllow() bool {
+	utils.PrintTitle("<=", fmt.Sprintf("Allow to execute command? [cancel by ctrl+c] (%s/%s): ", color.GreenString("y"), color.RedString("n")))
 	var input string
 	fmt.Scanln(&input)
-	if strings.ToLower(input) == "y" || strings.ToLower(input) == "yes" {
-		return true
+	for range 3 {
+		if strings.ToLower(input) == "y" || strings.ToLower(input) == "yes" {
+			return true
+		}
+		if strings.ToLower(input) == "n" || strings.ToLower(input) == "no" {
+			return false
+		}
 	}
 	return false
 }
