@@ -31,13 +31,21 @@ func PrintlnWarnTitle(flag, message string) {
 }
 
 func PrintMessage(message string) {
-	fmt.Println(color.CyanString(message))
+	color.Cyan("%s", message)
 }
 
 func PrintErr(message string) {
-	fmt.Println(color.RedString(message))
+	if len(message) > 100 {
+		color.Red("%s\n...(truncated)", message[:100])
+	} else {
+		color.Red(message)
+	}
 }
 
 func PrintWarn(message string) {
-	fmt.Println(color.YellowString(message))
+	if len(message) > 100 {
+		color.Yellow("%s\n...(truncated)", message[:100])
+	} else {
+		color.Yellow(message)
+	}
 }
