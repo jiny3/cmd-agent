@@ -11,7 +11,8 @@ import (
 	"github.com/spf13/viper"
 )
 
-var Init = func() {
+func Init() {
+	// init config
 	confPath, err := envx.Home()
 	if err != nil {
 		logrus.WithError(err).Warn("get home path failed, use default config path")
@@ -40,6 +41,7 @@ var Init = func() {
 		}
 	}
 
+	// init log
 	logPath, level := viper.GetString("log.path"), viper.GetString("log.level")
 	_level, err := logrus.ParseLevel(level)
 	if err != nil {

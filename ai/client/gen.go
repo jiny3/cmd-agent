@@ -5,7 +5,6 @@ import (
 
 	"github.com/jiny3/cmd-agent/ai/tools"
 	"github.com/jiny3/cmd-agent/utils"
-	"github.com/jiny3/gopkg/hookx"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"google.golang.org/genai"
@@ -18,7 +17,7 @@ var (
 )
 
 func init() {
-	hookx.Init(&utils.Init)
+	utils.Init()
 	apiKey = viper.GetString("api.key")
 	if apiKey == "" {
 		logrus.Fatal("api key is empty")
@@ -76,7 +75,6 @@ func GenerateContent(prompt string, tool ...*genai.Tool) (string, error) {
 				outStr = (out.([]string))[0]
 				errResp += (out.([]string))[1]
 			}
-			logrus.WithField("output", outStr).WithField("error", errResp).Debug("function call response")
 			_prompt = append(_prompt, FormatFunctionCallResponse(call, map[string]any{
 				"output": outStr,
 				"error":  errResp,
