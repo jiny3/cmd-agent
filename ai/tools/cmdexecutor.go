@@ -4,9 +4,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
+	"os"
 	"os/exec"
+	"os/signal"
 	"strings"
-	"time"
+	"syscall"
 
 	"github.com/fatih/color"
 	"github.com/jiny3/cmd-agent/utils"
@@ -68,32 +71,34 @@ func cmdExecutor(args ...any) (any, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "bash", "-c", command)
+	cmd.Stdin = os.Stdin
 	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	// Run the command
-	err = cmd.Run()
+	cmd.Stdout = io.MultiWriter(os.Stdout, &stdout)
+	cmd.Stderr = io.MultiWriter(os.Stderr, &stderr)
+	go exitCall(cancel)
+	err := cmd.Run()
+
+	// Capture the output and error
 	outStr, errStr := stdout.String(), stderr.String()
-	if err != nil {
+	if err != nil && err != context.Canceled {
 		utils.PrintlnErrTitle("=>", "FAIL:")
-		if err == context.DeadlineExceeded {
-			utils.PrintErr(fmt.Sprintf("Command timed out after %.2f", timeoutInt.Seconds()))
-		} else {
-			utils.PrintErr(err.Error())
-		}
-		if errStr != "" {
-			utils.PrintlnWarnTitle("=>", "STDERR:")
-			utils.PrintWarn(errStr)
-		}
-		return nil, err
+		utils.PrintErr(err.Error())
 	}
-	utils.PrintlnTitle("=>", "SUCCESS:")
-	utils.PrintMessage(outStr)
+	utils.PrintlnTitle("=>", "STDOUT:")
+	if len(outStr) > 100 {
+		utils.PrintMessage(fmt.Sprintf("%s\n...(truncated)", outStr[:100]))
+	} else {
+		utils.PrintMessage(outStr)
+	}
 	if errStr != "" {
 		utils.PrintlnWarnTitle("=>", "STDERR:")
-		utils.PrintWarn(errStr)
+		if len(errStr) > 100 {
+			utils.PrintWarn(fmt.Sprintf("%s\n...(truncated)", errStr[:100]))
+		} else {
+			utils.PrintWarn(errStr)
+		}
 	}
-	return []string{outStr, errStr}, nil
+	return []string{outStr[:min(100, len(outStr))], errStr[:min(100, len(errStr))]}, nil
 }
 
 func waitingUserAllow() bool {
@@ -109,4 +114,11 @@ func waitingUserAllow() bool {
 		}
 	}
 	return false
+}
+
+func exitCall(cancel context.CancelFunc) {
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, os.Interrupt, syscall.SIGTERM)
+	<-sigs
+	cancel()
 }
