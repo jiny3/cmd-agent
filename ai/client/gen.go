@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 
+	"github.com/jiny3/cmd-agent/ai/rag"
 	"github.com/jiny3/cmd-agent/ai/tools"
 	"github.com/jiny3/cmd-agent/utils"
 	"github.com/sirupsen/logrus"
@@ -40,6 +41,10 @@ func init() {
 
 func GenerateContent(prompt string, tool ...*genai.Tool) (string, error) {
 	_prompt := systemContents
+	// Insert historical context from different shells
+	if msgs := rag.GetContextMessages(); len(msgs) > 0 {
+		_prompt = append(_prompt, msgs...)
+	}
 	_prompt = append(_prompt, genai.Text(prompt)...)
 	result, err := aiClient.Models.GenerateContent(
 		context.Background(),
